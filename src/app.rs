@@ -50,6 +50,12 @@ struct Notice {
     error: bool,
     until: f64,
 }
+#[derive(Default)]
+struct ReplacePreview {
+    occurrences: usize,
+    files: Vec<(PathBuf, usize)>,
+    errors: Vec<String>,
+}
 
 pub struct EditorApp {
     root: Option<PathBuf>,
@@ -65,6 +71,10 @@ pub struct EditorApp {
     show_explorer: bool,
     show_rows: bool,
     responsive_initialized: bool,
+    replace_open: bool,
+    replace_find: String,
+    replace_with: String,
+    replace_preview: Option<ReplacePreview>,
 }
 impl EditorApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -85,6 +95,10 @@ impl EditorApp {
             show_explorer: true,
             show_rows: true,
             responsive_initialized: false,
+            replace_open: false,
+            replace_find: String::new(),
+            replace_with: String::new(),
+            replace_preview: None,
         };
         let startup = std::env::args_os()
             .nth(1)
@@ -168,6 +182,89 @@ impl EditorApp {
             self.toast(ctx, e, true)
         } else {
             self.toast(ctx, format!("บันทึก {} ไฟล์แล้ว", saved), false)
+        }
+    }
+    fn scan_replace(&self) -> ReplacePreview {
+        let mut preview = ReplacePreview::default();
+        if self.replace_find.is_empty() {
+            return preview;
+        }
+        for path in &self.files {
+            let loaded;
+            let doc = if let Some(doc) = self.docs.get(path) {
+                doc
+            } else {
+                match Document::load(path) {
+                    Ok(doc) => {
+                        loaded = doc;
+                        &loaded
+                    }
+                    Err(error) => {
+                        preview.errors.push(format!(
+                            "{}: {error}",
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        ));
+                        continue;
+                    }
+                }
+            };
+            let matches = doc.count_thai_matches(&self.replace_find);
+            if matches > 0 {
+                preview.occurrences += matches;
+                preview.files.push((path.clone(), matches));
+            }
+        }
+        preview
+    }
+    fn replace_and_save(&mut self, ctx: &egui::Context) {
+        let find = self.replace_find.clone();
+        let replacement = self.replace_with.clone();
+        if find.is_empty() {
+            return;
+        }
+        let mut occurrences = 0;
+        let mut changed_files = 0;
+        let mut errors = Vec::new();
+        for path in self.files.clone() {
+            let result = if let Some(doc) = self.docs.get_mut(&path) {
+                replace_document_and_save(doc, &find, &replacement)
+            } else {
+                match Document::load(&path) {
+                    Ok(mut doc) => replace_document_and_save(&mut doc, &find, &replacement),
+                    Err(error) => Err(error),
+                }
+            };
+            match result {
+                Ok(count) if count > 0 => {
+                    occurrences += count;
+                    changed_files += 1;
+                }
+                Ok(_) => {}
+                Err(error) => errors.push(format!(
+                    "{}: {error}",
+                    path.file_name().unwrap_or_default().to_string_lossy()
+                )),
+            }
+        }
+        self.replace_preview = None;
+        if errors.is_empty() {
+            self.replace_open = false;
+            self.toast(
+                ctx,
+                format!("แทนที่และบันทึกแล้ว {occurrences} จุดใน {changed_files} ไฟล์"),
+                false,
+            );
+        } else {
+            self.toast(
+                ctx,
+                format!("บันทึกได้ {changed_files} ไฟล์ แต่ผิดพลาด {} ไฟล์", errors.len()),
+                true,
+            );
+            self.replace_preview = Some(ReplacePreview {
+                occurrences,
+                files: Vec::new(),
+                errors,
+            });
         }
     }
     fn close_tab(&mut self, path: &PathBuf) {
@@ -254,6 +351,13 @@ impl EditorApp {
                         .clicked()
                     {
                         self.save_all(ctx)
+                    }
+                    if ui
+                        .add_enabled(self.root.is_some(), egui::Button::new("Replace  Ctrl+H"))
+                        .on_hover_text("Find and replace Thai text across every TSV file")
+                        .clicked()
+                    {
+                        self.replace_open = true;
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
@@ -773,8 +877,160 @@ impl EditorApp {
         }) {
             self.choose_folder()
         }
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::CTRL,
+                egui::Key::H,
+            ))
+        }) && self.root.is_some()
+        {
+            self.replace_open = true;
+        }
     }
     fn dialogs(&mut self, ctx: &egui::Context) {
+        if self.replace_open {
+            let mut open = true;
+            egui::Window::new("Replace across folder")
+                .open(&mut open)
+                .collapsible(false)
+                .resizable(true)
+                .default_width(560.0)
+                .min_width(440.0)
+                .show(ctx, |ui| {
+                    egui::Frame::new()
+                        .fill(ui.visuals().faint_bg_color)
+                        .corner_radius(8)
+                        .inner_margin(12)
+                        .show(ui, |ui| {
+                            ui.label(RichText::new("THAI TRANSLATION ONLY").strong());
+                            ui.label(
+                                RichText::new(
+                                    "Searches every TSV in the opened folder. English and IDs are never changed.",
+                                )
+                                .size(12.0)
+                                .color(ui.visuals().weak_text_color()),
+                            );
+                        });
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Find").strong());
+                    let find_changed = ui
+                        .add(
+                            egui::TextEdit::multiline(&mut self.replace_find)
+                                .desired_rows(2)
+                                .hint_text("ข้อความภาษาไทยที่ต้องการค้นหา…")
+                                .desired_width(f32::INFINITY),
+                        )
+                        .changed();
+                    ui.add_space(6.0);
+                    ui.label(RichText::new("Replace with").strong());
+                    let replacement_changed = ui
+                        .add(
+                            egui::TextEdit::multiline(&mut self.replace_with)
+                                .desired_rows(2)
+                                .hint_text("ข้อความใหม่…")
+                                .desired_width(f32::INFINITY),
+                        )
+                        .changed();
+                    if find_changed || replacement_changed {
+                        self.replace_preview = None;
+                    }
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        if ui
+                            .add_enabled(
+                                !self.replace_find.is_empty(),
+                                egui::Button::new("Scan all TSV files"),
+                            )
+                            .clicked()
+                        {
+                            self.replace_preview = Some(self.scan_replace());
+                        }
+                        ui.label(
+                            RichText::new("Exact text · case-sensitive · recursive")
+                                .size(11.0)
+                                .color(ui.visuals().weak_text_color()),
+                        );
+                    });
+                    if let Some(preview) = &self.replace_preview {
+                        ui.add_space(10.0);
+                        ui.separator();
+                        ui.add_space(6.0);
+                        ui.label(
+                            RichText::new(format!(
+                                "{} occurrence(s) in {} file(s)",
+                                preview.occurrences,
+                                preview.files.len()
+                            ))
+                            .size(17.0)
+                            .strong(),
+                        );
+                        if preview.files.is_empty() && preview.errors.is_empty() {
+                            ui.label(
+                                RichText::new("No matching Thai text was found.")
+                                    .color(ui.visuals().weak_text_color()),
+                            );
+                        }
+                        egui::ScrollArea::vertical()
+                            .max_height(150.0)
+                            .show(ui, |ui| {
+                                for (path, count) in &preview.files {
+                                    let display = self
+                                        .root
+                                        .as_ref()
+                                        .and_then(|root| path.strip_prefix(root).ok())
+                                        .unwrap_or(path)
+                                        .display();
+                                    ui.horizontal(|ui| {
+                                        ui.label(RichText::new(display.to_string()).monospace());
+                                        ui.with_layout(
+                                            egui::Layout::right_to_left(egui::Align::Center),
+                                            |ui| {
+                                                ui.label(format!("{count}×"));
+                                            },
+                                        );
+                                    });
+                                }
+                                for error in &preview.errors {
+                                    ui.label(RichText::new(error).color(danger(ui)));
+                                }
+                            });
+                        if preview.occurrences > 0 && preview.errors.is_empty() {
+                            ui.add_space(8.0);
+                            egui::Frame::new()
+                                .fill(Color32::from_rgba_unmultiplied(
+                                    warning(ui).r(),
+                                    warning(ui).g(),
+                                    warning(ui).b(),
+                                    24,
+                                ))
+                                .corner_radius(8)
+                                .inner_margin(10)
+                                .show(ui, |ui| {
+                                    ui.label(
+                                        "This action saves every affected TSV immediately. A .bak copy is created beside each changed file.",
+                                    );
+                                });
+                            ui.add_space(8.0);
+                            if ui
+                                .add_sized(
+                                    [ui.available_width(), 44.0],
+                                    egui::Button::new(
+                                        RichText::new(format!(
+                                            "Replace {} occurrence(s) and save",
+                                            preview.occurrences
+                                        ))
+                                        .strong(),
+                                    ),
+                                )
+                                .clicked()
+                            {
+                                self.replace_and_save(ctx);
+                            }
+                        }
+                    }
+                });
+            self.replace_open = open && self.replace_open;
+        }
         if self.confirm_folder.is_some() {
             egui::Window::new("Unsaved changes")
                 .collapsible(false)
@@ -1107,6 +1363,22 @@ fn adjacent_file_in_folder(
     let next = (current as isize + delta).rem_euclid(siblings.len() as isize) as usize;
     Some(siblings[next].clone())
 }
+fn replace_document_and_save(
+    doc: &mut Document,
+    find: &str,
+    replacement: &str,
+) -> anyhow::Result<usize> {
+    let count = doc.count_thai_matches(find);
+    if count == 0 {
+        return Ok(0);
+    }
+    let mut backup_name = doc.path.as_os_str().to_os_string();
+    backup_name.push(".bak");
+    std::fs::copy(&doc.path, PathBuf::from(backup_name))?;
+    doc.replace_thai_all(find, replacement);
+    doc.save()?;
+    Ok(count)
+}
 fn truncate(s: &str, n: usize) -> String {
     let mut out = s.chars().take(n).collect::<String>();
     if s.chars().count() > n {
@@ -1243,7 +1515,8 @@ fn save_settings(settings: &Settings) {
 
 #[cfg(test)]
 mod tests {
-    use super::adjacent_file_in_folder;
+    use super::{adjacent_file_in_folder, replace_document_and_save};
+    use crate::model::Document;
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -1277,5 +1550,30 @@ mod tests {
             adjacent_file_in_folder(&files, Some(Path::new("/workspace/split/a.tsv")), -1),
             Some(PathBuf::from("/workspace/split/b.tsv"))
         );
+    }
+
+    #[test]
+    fn workspace_replace_saves_and_creates_backup() {
+        let folder =
+            std::env::temp_dir().join(format!("ro3-editor-replace-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let path = folder.join("sample.tsv");
+        let original = "ID\tEnglish\tThai\r\n1\tNeutral melee\tข้อความเดิม\r\n";
+        std::fs::write(&path, original).unwrap();
+        let mut doc = Document::load(&path).unwrap();
+
+        assert_eq!(
+            replace_document_and_save(&mut doc, "ข้อความเดิม", "ข้อความใหม่").unwrap(),
+            1
+        );
+        assert!(std::fs::read_to_string(&path)
+            .unwrap()
+            .contains("ข้อความใหม่"));
+        assert_eq!(
+            std::fs::read_to_string(folder.join("sample.tsv.bak")).unwrap(),
+            original
+        );
+        std::fs::remove_dir_all(folder).unwrap();
     }
 }

@@ -2542,7 +2542,7 @@ dependencies = [
 
 [[package]]
 name = "ro3-translation-editor"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "csv",

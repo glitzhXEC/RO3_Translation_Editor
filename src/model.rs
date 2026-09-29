@@ -133,6 +133,29 @@ impl Document {
             self.refresh_state(index);
         }
     }
+    pub fn count_thai_matches(&self, find: &str) -> usize {
+        if find.is_empty() {
+            return 0;
+        }
+        (0..self.len())
+            .map(|index| self.thai(index).matches(find).count())
+            .sum()
+    }
+    pub fn replace_thai_all(&mut self, find: &str, replacement: &str) -> usize {
+        if find.is_empty() {
+            return 0;
+        }
+        let mut replacements = 0;
+        for index in 0..self.len() {
+            let matches = self.thai(index).matches(find).count();
+            if matches > 0 {
+                let value = self.thai(index).replace(find, replacement);
+                self.set_thai(index, value);
+                replacements += matches;
+            }
+        }
+        replacements
+    }
     pub fn refresh_states(&mut self) {
         self.states = (0..self.len()).map(|i| self.compute_state(i)).collect();
     }
@@ -375,5 +398,50 @@ mod tests {
         let rendered = parts.iter().map(|p| p.text.as_str()).collect::<String>();
         assert_eq!(rendered, "DMG *50%+10\nRange 3m");
         assert!(parts.iter().any(|p| p.emphasized && p.text.contains("50")));
+    }
+    #[test]
+    fn replaces_only_thai_text_and_counts_every_occurrence() {
+        let mut doc = Document {
+            path: PathBuf::from("test.tsv"),
+            rows: vec![
+                vec!["ID".into(), "English".into(), "Thai".into()],
+                vec![
+                    "1".into(),
+                    "Neutral melee damage".into(),
+                    "สร้างความเสียหายระยะประชิดที่เป็นกลาง".into(),
+                ],
+                vec![
+                    "2".into(),
+                    "Neutral melee damage twice".into(),
+                    "สร้างความเสียหายระยะประชิดที่เป็นกลาง และ \
+                     สร้างความเสียหายระยะประชิดที่เป็นกลาง"
+                        .into(),
+                ],
+            ],
+            columns: Columns {
+                id: 0,
+                english: 1,
+                thai: 2,
+            },
+            selected: 0,
+            row_query: String::new(),
+            filter: RowFilter::All,
+            had_bom: false,
+            dirty: false,
+            states: Vec::new(),
+        };
+        doc.refresh_states();
+
+        assert_eq!(doc.count_thai_matches("สร้างความเสียหายระยะประชิดที่เป็นกลาง"), 3);
+        assert_eq!(
+            doc.replace_thai_all(
+                "สร้างความเสียหายระยะประชิดที่เป็นกลาง",
+                "ทำความเสียหายทางกายภาพไร้ธาตุระยะประชิด"
+            ),
+            3
+        );
+        assert_eq!(doc.english(0), "Neutral melee damage");
+        assert_eq!(doc.thai(0), "ทำความเสียหายทางกายภาพไร้ธาตุระยะประชิด");
+        assert!(doc.dirty);
     }
 }

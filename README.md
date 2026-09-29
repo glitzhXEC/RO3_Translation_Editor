@@ -10,6 +10,7 @@ Native desktop editor for translating RO3 TSV localization files by hand. This i
 - **Live game preview:** strips `^{…}`, inserts sample values for `${…}`/`@{…}`, highlights formatted values, and wraps the completed Thai text like an in-game tooltip.
 - **Safe translation:** English is selectable and copyable but read-only on the left; Thai is editable on the right. `${…}`, `@{…}`, `^{…}`, bracketed names, escaped characters, and HTML-like tags are validated live.
 - **Native saving:** `Ctrl+S` writes the current TSV directly; Save all writes every dirty tab. UTF-8 BOM and normal TSV quoting are preserved.
+- **Folder-wide replace:** `Ctrl+H` scans the Thai column across every TSV, previews occurrence and file counts, then replaces and saves all affected files with adjacent `.bak` backups.
 - **Offline:** no file content leaves the computer.
 
 ## Build
@@ -29,6 +30,7 @@ The Windows executable is produced at `target/release/ro3-translation-editor.exe
 - `Ctrl+O` — open folder
 - `Ctrl+S` — save active file
 - `Ctrl+Shift+S` — save all files
+- `Ctrl+H` — find and replace Thai text across the opened folder
 - `Ctrl+PageDown` / `Ctrl+PageUp` — select the next / previous TSV file in the current folder
 - `Ctrl+B` — toggle Explorer
 - `Ctrl+J` — toggle row navigator
