@@ -1,4 +1,4 @@
-use crate::model::{scan_tsv_files, tokens, validate, Document, RowFilter};
+use crate::model::{preview_parts, scan_tsv_files, tokens, validate, Document, RowFilter};
 use eframe::egui::{self, Color32, FontData, FontDefinitions, FontFamily, RichText, Stroke, Vec2};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -616,6 +616,8 @@ impl EditorApp {
                                             &mut copy_token,
                                         );
                                     });
+                                    ui.add_space(10.0);
+                                    game_preview(ui, &th);
                                     if th != doc.thai(i) {
                                         target_change = Some((i, th.clone()))
                                     }
@@ -857,7 +859,7 @@ fn language_pane(
                 ui.add_sized(
                     [
                         ui.available_width(),
-                        ui.available_height().clamp(260.0, 480.0),
+                        ui.available_height().clamp(240.0, 330.0),
                     ],
                     egui::TextEdit::multiline(text)
                         .font(egui::TextStyle::Body)
@@ -868,7 +870,7 @@ fn language_pane(
                 ui.add_sized(
                     [
                         ui.available_width(),
-                        ui.available_height().clamp(260.0, 480.0),
+                        ui.available_height().clamp(240.0, 330.0),
                     ],
                     egui::TextEdit::multiline(text)
                         .font(egui::TextStyle::Body)
@@ -876,6 +878,52 @@ fn language_pane(
                         .interactive(false),
                 );
             }
+        });
+}
+
+fn game_preview(ui: &mut egui::Ui, text: &str) {
+    let background = Color32::from_rgb(237, 231, 211);
+    let foreground = Color32::from_rgb(82, 74, 62);
+    let emphasis = Color32::from_rgb(211, 121, 38);
+    egui::Frame::new()
+        .fill(background)
+        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(215, 205, 181)))
+        .corner_radius(7)
+        .inner_margin(12)
+        .show(ui, |ui| {
+            ui.label(
+                RichText::new("GAME PREVIEW  ·  SAMPLE VALUES")
+                    .size(10.0)
+                    .strong()
+                    .color(Color32::from_rgb(126, 113, 91)),
+            );
+            ui.add_space(5.0);
+            if text.trim().is_empty() {
+                ui.label(
+                    RichText::new("คำแปลที่จัดรูปแบบแล้วจะแสดงตรงนี้")
+                        .size(15.0)
+                        .color(foreground),
+                );
+                return;
+            }
+            let mut job = egui::text::LayoutJob::default();
+            job.wrap.max_width = ui.available_width();
+            for part in preview_parts(text) {
+                job.append(
+                    &part.text,
+                    0.0,
+                    egui::TextFormat {
+                        font_id: egui::FontId::proportional(16.0),
+                        color: if part.emphasized {
+                            emphasis
+                        } else {
+                            foreground
+                        },
+                        ..Default::default()
+                    },
+                );
+            }
+            ui.label(job);
         });
 }
 fn validation_banner(ui: &mut egui::Ui, v: &crate::model::Validation, empty: bool) {

@@ -13,6 +13,9 @@ static STYLE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\^\{[^}\r\n]+\}").unwra
 static BRACKET_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?:\[|【)[^\]】\r\n]+(?:\]|】)").unwrap());
 static BROKEN_ARROW_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"↑\{\d+\}").unwrap());
+static PREVIEW_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?:\^\{[^}\r\n]+\})+|\$\{[^}\r\n]+\}|@\{[^}\r\n]+\}|\\[nrt]").unwrap()
+});
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RowFilter {
@@ -213,6 +216,63 @@ pub fn tokens(text: &str) -> Vec<String> {
         .map(|m| m.as_str().to_owned())
         .collect()
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PreviewPart {
+    pub text: String,
+    pub emphasized: bool,
+}
+
+pub fn preview_parts(text: &str) -> Vec<PreviewPart> {
+    let mut parts = Vec::new();
+    let mut cursor = 0;
+    let mut emphasized = false;
+    for token in PREVIEW_RE.find_iter(text) {
+        push_preview(&mut parts, &text[cursor..token.start()], emphasized);
+        let value = token.as_str();
+        if value.starts_with("^{") {
+            // Consecutive game-style markers form one visual boundary.
+            emphasized = !emphasized;
+        } else if value == r"\n" {
+            push_preview(&mut parts, "\n", false);
+        } else if value == r"\t" {
+            push_preview(&mut parts, "    ", false);
+        } else if value == r"\r" {
+            // Ignore a standalone escaped carriage return in preview.
+        } else {
+            push_preview(&mut parts, sample_value(value), true);
+        }
+        cursor = token.end();
+    }
+    push_preview(&mut parts, &text[cursor..], emphasized);
+    parts
+}
+
+fn sample_value(token: &str) -> &'static str {
+    let number = token
+        .trim_start_matches(['$', '@'])
+        .trim_matches(['{', '}'])
+        .parse::<usize>()
+        .unwrap_or(1);
+    const VALUES: [&str; 8] = ["50", "10", "3", "5", "2", "8", "20", "1"];
+    VALUES[(number.saturating_sub(1)) % VALUES.len()]
+}
+
+fn push_preview(parts: &mut Vec<PreviewPart>, text: &str, emphasized: bool) {
+    if text.is_empty() {
+        return;
+    }
+    if let Some(last) = parts.last_mut() {
+        if last.emphasized == emphasized {
+            last.text.push_str(text);
+            return;
+        }
+    }
+    parts.push(PreviewPart {
+        text: text.to_owned(),
+        emphasized,
+    });
+}
 fn counts(items: &[String]) -> HashMap<&str, usize> {
     let mut map = HashMap::new();
     for item in items {
@@ -308,5 +368,12 @@ mod tests {
     fn preserves_duplicate_tokens() {
         let v = validate("${1} ${1}", "${1}");
         assert_eq!(v.missing, vec!["${1}"]);
+    }
+    #[test]
+    fn creates_game_style_preview() {
+        let parts = preview_parts(r"DMG *^{1}${1}%+${2}^{2}\nRange ${3}m");
+        let rendered = parts.iter().map(|p| p.text.as_str()).collect::<String>();
+        assert_eq!(rendered, "DMG *50%+10\nRange 3m");
+        assert!(parts.iter().any(|p| p.emphasized && p.text.contains("50")));
     }
 }

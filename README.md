@@ -7,6 +7,7 @@ Native desktop editor for translating RO3 TSV localization files by hand. This i
 - **Dracula + minimal light themes:** readable semantic colors, clear focus, and no accidental text selection in row navigation.
 - **Workspace first:** open a folder once and browse every `.tsv` file recursively in Explorer.
 - **Editor workflow:** keep multiple files open as tabs, search rows, and filter by untranslated, issues, or completed rows.
+- **Live game preview:** strips `^{…}`, inserts sample values for `${…}`/`@{…}`, highlights formatted values, and wraps the completed Thai text like an in-game tooltip.
 - **Safe translation:** English is read-only on the left; Thai is editable on the right. `${…}`, `@{…}`, `^{…}`, bracketed names, escaped characters, and HTML-like tags are validated live.
 - **Native saving:** `Ctrl+S` writes the current TSV directly; Save all writes every dirty tab. UTF-8 BOM and normal TSV quoting are preserved.
 - **Offline:** no file content leaves the computer.
