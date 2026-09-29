@@ -974,15 +974,17 @@ fn language_pane(
                         .lock_focus(true),
                 );
             } else {
+                // `&str` implements egui's immutable TextBuffer: users can
+                // focus, select, and copy the source without modifying it.
+                let mut read_only = text.as_str();
                 ui.add_sized(
                     [
                         ui.available_width(),
                         ui.available_height().clamp(240.0, 330.0),
                     ],
-                    egui::TextEdit::multiline(text)
+                    egui::TextEdit::multiline(&mut read_only)
                         .font(egui::TextStyle::Body)
-                        .desired_width(f32::INFINITY)
-                        .interactive(false),
+                        .desired_width(f32::INFINITY),
                 );
             }
         });
