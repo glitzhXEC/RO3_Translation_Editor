@@ -282,48 +282,65 @@ impl EditorApp {
     }
     fn explorer(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("explorer")
-            .default_width(270.0)
-            .min_width(220.0)
-            .max_width(400.0)
+            .default_width(320.0)
+            .min_width(280.0)
+            .max_width(480.0)
             .resizable(true)
             .frame(
                 egui::Frame::new()
                     .fill(ctx.style().visuals.panel_fill)
-                    .inner_margin(egui::Margin::same(12)),
+                    .inner_margin(egui::Margin::ZERO),
             )
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new("EXPLORER")
-                            .size(12.0)
-                            .strong()
-                            .color(ui.visuals().weak_text_color()),
-                    );
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(format!("{} TSV", self.files.len()));
-                    });
-                });
-                ui.add_space(8.0);
-                ui.add(
-                    egui::TextEdit::singleline(&mut self.file_query)
-                        .hint_text("Search files…")
-                        .desired_width(f32::INFINITY),
-                );
-                ui.add_space(8.0);
-                if self.root.is_none() {
-                    ui.add_space(30.0);
-                    ui.vertical_centered(|ui| {
-                        ui.label(RichText::new("No folder opened").strong());
-                        ui.label(
-                            RichText::new("Open a folder to browse every .tsv file recursively.")
-                                .small()
-                                .color(ui.visuals().weak_text_color()),
+                egui::Frame::new()
+                    .inner_margin(egui::Margin {
+                        left: 12,
+                        right: 12,
+                        top: 12,
+                        bottom: 8,
+                    })
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::new("EXPLORER")
+                                    .size(12.0)
+                                    .strong()
+                                    .color(ui.visuals().weak_text_color()),
+                            );
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(format!("{} TSV", self.files.len()));
+                                },
+                            );
+                        });
+                        ui.add_space(8.0);
+                        ui.add(
+                            egui::TextEdit::singleline(&mut self.file_query)
+                                .hint_text("Search files…")
+                                .desired_width(f32::INFINITY),
                         );
-                        ui.add_space(10.0);
-                        if ui.button("Open folder").clicked() {
-                            self.choose_folder()
-                        }
                     });
+                if self.root.is_none() {
+                    egui::Frame::new()
+                        .inner_margin(egui::Margin::same(12))
+                        .show(ui, |ui| {
+                            ui.add_space(30.0);
+                            ui.vertical_centered(|ui| {
+                                ui.label(RichText::new("No folder opened").strong());
+                                ui.label(
+                                    RichText::new(
+                                        "Open a folder to browse every .tsv file recursively.",
+                                    )
+                                    .small()
+                                    .color(ui.visuals().weak_text_color()),
+                                );
+                                ui.add_space(10.0);
+                                if ui.button("Open folder").clicked() {
+                                    self.choose_folder()
+                                }
+                            });
+                        });
                     return;
                 }
                 let root = self.root.clone().unwrap();
@@ -344,40 +361,56 @@ impl EditorApp {
                 let mut open = None;
                 egui::ScrollArea::vertical()
                     .id_salt("files")
+                    .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        let mut last_dir = PathBuf::new();
-                        for path in visible {
-                            let rel = path.strip_prefix(&root).unwrap_or(&path);
-                            let dir = rel.parent().unwrap_or(Path::new(""));
-                            if dir != last_dir {
-                                last_dir = dir.to_owned();
-                                ui.add_space(8.0);
-                                ui.label(
-                                    RichText::new(if dir.as_os_str().is_empty() {
-                                        "/".into()
-                                    } else {
-                                        dir.to_string_lossy().into_owned()
-                                    })
-                                    .size(11.0)
-                                    .strong()
-                                    .color(ui.visuals().weak_text_color()),
-                                );
-                            }
-                            let dirty = self.docs.get(&path).is_some_and(|d| d.dirty);
-                            let active = self.active.as_ref() == Some(&path);
-                            let name = format!(
-                                "{}{}",
-                                if dirty { "● " } else { "" },
-                                rel.file_name().unwrap_or_default().to_string_lossy()
-                            );
-                            if ui
-                                .selectable_label(active, name)
-                                .on_hover_text(rel.display().to_string())
-                                .clicked()
-                            {
-                                open = Some(path)
-                            }
-                        }
+                        // The scrollbar stays flush to the panel edge; only the
+                        // list content receives horizontal breathing room.
+                        egui::Frame::new()
+                            .inner_margin(egui::Margin {
+                                left: 12,
+                                right: 4,
+                                top: 0,
+                                bottom: 12,
+                            })
+                            .show(ui, |ui| {
+                                let mut last_dir = PathBuf::new();
+                                for path in visible {
+                                    let rel = path.strip_prefix(&root).unwrap_or(&path);
+                                    let dir = rel.parent().unwrap_or(Path::new(""));
+                                    if dir != last_dir {
+                                        last_dir = dir.to_owned();
+                                        ui.add_space(8.0);
+                                        ui.label(
+                                            RichText::new(if dir.as_os_str().is_empty() {
+                                                "ROOT".into()
+                                            } else {
+                                                dir.to_string_lossy().into_owned()
+                                            })
+                                            .size(11.0)
+                                            .strong()
+                                            .color(ui.visuals().weak_text_color()),
+                                        )
+                                        .on_hover_text(dir.display().to_string());
+                                    }
+                                    let dirty = self.docs.get(&path).is_some_and(|d| d.dirty);
+                                    let active = self.active.as_ref() == Some(&path);
+                                    let name = format!(
+                                        "{}{}",
+                                        if dirty { "● " } else { "" },
+                                        rel.file_name().unwrap_or_default().to_string_lossy()
+                                    );
+                                    if ui
+                                        .add_sized(
+                                            [ui.available_width(), 40.0],
+                                            egui::SelectableLabel::new(active, name),
+                                        )
+                                        .on_hover_text(rel.display().to_string())
+                                        .clicked()
+                                    {
+                                        open = Some(path)
+                                    }
+                                }
+                            });
                     });
                 if let Some(path) = open {
                     self.open_file(ctx, path)
@@ -675,16 +708,9 @@ impl EditorApp {
             });
     }
     fn navigate_file(&mut self, ctx: &egui::Context, delta: isize) {
-        if self.files.is_empty() {
-            return;
+        if let Some(next) = adjacent_file_in_folder(&self.files, self.active.as_deref(), delta) {
+            self.open_file(ctx, next);
         }
-        let current = self
-            .active
-            .as_ref()
-            .and_then(|p| self.files.iter().position(|x| x == p))
-            .unwrap_or(0) as isize;
-        let next = (current + delta).rem_euclid(self.files.len() as isize) as usize;
-        self.open_file(ctx, self.files[next].clone());
     }
     fn shortcuts(&mut self, ctx: &egui::Context) {
         if ctx.input_mut(|i| {
@@ -1064,6 +1090,21 @@ fn next_issue(doc: &Document) -> Option<usize> {
         .chain(0..=doc.selected)
         .find(|&i| doc.states[i].issue)
 }
+fn adjacent_file_in_folder(
+    files: &[PathBuf],
+    active: Option<&Path>,
+    delta: isize,
+) -> Option<PathBuf> {
+    let active = active?;
+    let parent = active.parent();
+    let siblings: Vec<&PathBuf> = files
+        .iter()
+        .filter(|path| path.parent() == parent)
+        .collect();
+    let current = siblings.iter().position(|path| path.as_path() == active)?;
+    let next = (current as isize + delta).rem_euclid(siblings.len() as isize) as usize;
+    Some(siblings[next].clone())
+}
 fn truncate(s: &str, n: usize) -> String {
     let mut out = s.chars().take(n).collect::<String>();
     if s.chars().count() > n {
@@ -1195,5 +1236,44 @@ fn save_settings(settings: &Settings) {
         if let Ok(json) = serde_json::to_string_pretty(settings) {
             let _ = std::fs::write(path, json);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::adjacent_file_in_folder;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn file_navigation_stays_in_current_folder() {
+        let files = vec![
+            PathBuf::from("/workspace/root.tsv"),
+            PathBuf::from("/workspace/split/a.tsv"),
+            PathBuf::from("/workspace/split/b.tsv"),
+            PathBuf::from("/workspace/other/c.tsv"),
+        ];
+
+        assert_eq!(
+            adjacent_file_in_folder(&files, Some(Path::new("/workspace/split/a.tsv")), 1),
+            Some(PathBuf::from("/workspace/split/b.tsv"))
+        );
+        assert_eq!(
+            adjacent_file_in_folder(&files, Some(Path::new("/workspace/split/b.tsv")), 1),
+            Some(PathBuf::from("/workspace/split/a.tsv"))
+        );
+    }
+
+    #[test]
+    fn reverse_file_navigation_wraps_in_current_folder() {
+        let files = vec![
+            PathBuf::from("/workspace/split/a.tsv"),
+            PathBuf::from("/workspace/split/b.tsv"),
+            PathBuf::from("/workspace/other/c.tsv"),
+        ];
+
+        assert_eq!(
+            adjacent_file_in_folder(&files, Some(Path::new("/workspace/split/a.tsv")), -1),
+            Some(PathBuf::from("/workspace/split/b.tsv"))
+        );
     }
 }

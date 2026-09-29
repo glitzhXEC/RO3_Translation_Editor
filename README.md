@@ -29,7 +29,7 @@ The Windows executable is produced at `target/release/ro3-translation-editor.exe
 - `Ctrl+O` — open folder
 - `Ctrl+S` — save active file
 - `Ctrl+Shift+S` — save all files
-- `Ctrl+PageDown` / `Ctrl+PageUp` — next / previous TSV file
+- `Ctrl+PageDown` / `Ctrl+PageUp` — select the next / previous TSV file in the current folder
 - `Ctrl+B` — toggle Explorer
 - `Ctrl+J` — toggle row navigator
 
