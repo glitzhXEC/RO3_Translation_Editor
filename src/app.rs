@@ -62,6 +62,9 @@ pub struct EditorApp {
     notice: Option<Notice>,
     confirm_close: bool,
     confirm_folder: Option<PathBuf>,
+    show_explorer: bool,
+    show_rows: bool,
+    responsive_initialized: bool,
 }
 impl EditorApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -79,6 +82,9 @@ impl EditorApp {
             notice: None,
             confirm_close: false,
             confirm_folder: None,
+            show_explorer: true,
+            show_rows: true,
+            responsive_initialized: false,
         };
         let startup = std::env::args_os()
             .nth(1)
@@ -176,7 +182,7 @@ impl EditorApp {
     }
     fn top_bar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top")
-            .exact_height(58.0)
+            .exact_height(64.0)
             .frame(
                 egui::Frame::new()
                     .fill(ctx.style().visuals.panel_fill)
@@ -210,8 +216,20 @@ impl EditorApp {
                         );
                     });
                     ui.add_space(18.0);
-                    if ui.button("📁  Open folder").clicked() {
+                    if ui.button("Open folder").clicked() {
                         self.choose_folder()
+                    }
+                    if ui
+                        .selectable_label(self.show_explorer, "Explorer  Ctrl+B")
+                        .clicked()
+                    {
+                        self.show_explorer = !self.show_explorer;
+                    }
+                    if ui
+                        .selectable_label(self.show_rows, "Rows  Ctrl+J")
+                        .clicked()
+                    {
+                        self.show_rows = !self.show_rows;
                     }
                     ui.separator();
                     let dirty = self.dirty_count();
@@ -454,10 +472,17 @@ impl EditorApp {
                 });
                 ui.add_space(6.0);
                 egui_extras::StripBuilder::new(ui)
-                    .size(egui_extras::Size::exact(320.0))
+                    .size(egui_extras::Size::exact(if self.show_rows {
+                        300.0
+                    } else {
+                        0.0
+                    }))
                     .size(egui_extras::Size::remainder())
                     .horizontal(|mut strip| {
                         strip.cell(|ui| {
+                            if !self.show_rows {
+                                return;
+                            }
                             egui::Frame::new()
                                 .fill(ui.visuals().panel_fill)
                                 .corner_radius(8)
@@ -483,7 +508,7 @@ impl EditorApp {
                                     });
                                     ui.separator();
                                     let indices = doc.filtered_indices();
-                                    let row_h = 58.0;
+                                    let row_h = 66.0;
                                     egui::ScrollArea::vertical().id_salt("rows").show_rows(
                                         ui,
                                         row_h,
@@ -649,7 +674,51 @@ impl EditorApp {
                 let _ = available;
             });
     }
+    fn navigate_file(&mut self, ctx: &egui::Context, delta: isize) {
+        if self.files.is_empty() {
+            return;
+        }
+        let current = self
+            .active
+            .as_ref()
+            .and_then(|p| self.files.iter().position(|x| x == p))
+            .unwrap_or(0) as isize;
+        let next = (current + delta).rem_euclid(self.files.len() as isize) as usize;
+        self.open_file(ctx, self.files[next].clone());
+    }
     fn shortcuts(&mut self, ctx: &egui::Context) {
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::CTRL,
+                egui::Key::B,
+            ))
+        }) {
+            self.show_explorer = !self.show_explorer;
+        }
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::CTRL,
+                egui::Key::J,
+            ))
+        }) {
+            self.show_rows = !self.show_rows;
+        }
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::CTRL,
+                egui::Key::PageDown,
+            ))
+        }) {
+            self.navigate_file(ctx, 1);
+        }
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::CTRL,
+                egui::Key::PageUp,
+            ))
+        }) {
+            self.navigate_file(ctx, -1);
+        }
         if ctx.input_mut(|i| {
             i.consume_shortcut(&egui::KeyboardShortcut::new(
                 egui::Modifiers::CTRL,
@@ -734,6 +803,16 @@ impl EditorApp {
 }
 impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        if !self.responsive_initialized {
+            let width = ctx.input(|i| i.screen_rect().width());
+            if width < 1180.0 {
+                self.show_explorer = false;
+            }
+            if width < 860.0 {
+                self.show_rows = false;
+            }
+            self.responsive_initialized = true;
+        }
         self.shortcuts(ctx);
         if ctx.input(|i| i.viewport().close_requested())
             && self.dirty_count() > 0
@@ -743,7 +822,9 @@ impl eframe::App for EditorApp {
             self.confirm_close = true
         }
         self.top_bar(ctx);
-        self.explorer(ctx);
+        if self.show_explorer {
+            self.explorer(ctx);
+        }
         self.central(ctx);
         self.dialogs(ctx);
         if let Some(n) = &self.notice {
@@ -1087,13 +1168,13 @@ fn apply_theme(ctx: &egui::Context, dark: bool) {
     visuals.window_corner_radius = 10.into();
     ctx.set_visuals(visuals);
     let mut style = (*ctx.style()).clone();
-    style.spacing.item_spacing = Vec2::new(8.0, 8.0);
-    style.spacing.button_padding = Vec2::new(11.0, 7.0);
+    style.spacing.item_spacing = Vec2::new(10.0, 10.0);
+    style.spacing.button_padding = Vec2::new(13.0, 9.0);
     style
         .text_styles
         .get_mut(&egui::TextStyle::Body)
         .unwrap()
-        .size = 15.0;
+        .size = 15.5;
     ctx.set_style(style);
 }
 fn settings_path() -> Option<PathBuf> {
