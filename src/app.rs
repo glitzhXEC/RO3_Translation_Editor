@@ -4,10 +4,41 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-const BLUE: Color32 = Color32::from_rgb(39, 131, 222);
-const GREEN: Color32 = Color32::from_rgb(46, 142, 99);
-const RED: Color32 = Color32::from_rgb(220, 82, 75);
-const ORANGE: Color32 = Color32::from_rgb(190, 111, 40);
+fn accent(ui: &egui::Ui) -> Color32 {
+    if ui.visuals().dark_mode {
+        Color32::from_rgb(189, 147, 249)
+    } else {
+        Color32::from_rgb(39, 131, 222)
+    }
+}
+fn success(ui: &egui::Ui) -> Color32 {
+    if ui.visuals().dark_mode {
+        Color32::from_rgb(80, 250, 123)
+    } else {
+        Color32::from_rgb(46, 142, 99)
+    }
+}
+fn danger(ui: &egui::Ui) -> Color32 {
+    if ui.visuals().dark_mode {
+        Color32::from_rgb(255, 85, 85)
+    } else {
+        Color32::from_rgb(220, 82, 75)
+    }
+}
+fn warning(ui: &egui::Ui) -> Color32 {
+    if ui.visuals().dark_mode {
+        Color32::from_rgb(255, 184, 108)
+    } else {
+        Color32::from_rgb(190, 111, 40)
+    }
+}
+fn primary_text(ui: &egui::Ui) -> Color32 {
+    if ui.visuals().dark_mode {
+        Color32::from_rgb(248, 248, 242)
+    } else {
+        Color32::from_rgb(44, 44, 43)
+    }
+}
 #[derive(Default, Serialize, Deserialize)]
 struct Settings {
     recent_folder: Option<PathBuf>,
@@ -158,7 +189,7 @@ impl EditorApp {
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
                     egui::Frame::new()
-                        .fill(BLUE)
+                        .fill(accent(ui))
                         .corner_radius(8)
                         .inner_margin(8)
                         .show(ui, |ui| {
@@ -166,7 +197,12 @@ impl EditorApp {
                         });
                     ui.add_space(4.0);
                     ui.vertical(|ui| {
-                        ui.label(RichText::new("RO3 Translation Editor").size(18.0).strong());
+                        ui.label(
+                            RichText::new("RO3 Translation Editor")
+                                .size(18.0)
+                                .strong()
+                                .color(primary_text(ui)),
+                        );
                         ui.label(
                             RichText::new("Native TSV workspace")
                                 .size(11.0)
@@ -388,7 +424,12 @@ impl EditorApp {
                 let doc = self.docs.get_mut(&path).unwrap();
                 let (translated, issues) = doc.stats();
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(doc.file_name()).size(16.0).strong());
+                    ui.label(
+                        RichText::new(doc.file_name())
+                            .size(16.0)
+                            .strong()
+                            .color(primary_text(ui)),
+                    );
                     ui.label(
                         RichText::new(format!(
                             "{} rows  ·  {} translated  ·  {} issues",
@@ -453,9 +494,9 @@ impl EditorApp {
                                                 let state = doc.states[i];
                                                 let selected = doc.selected == i;
                                                 let dot = if state.issue {
-                                                    RED
+                                                    danger(ui)
                                                 } else if state.translated {
-                                                    GREEN
+                                                    success(ui)
                                                 } else {
                                                     ui.visuals().weak_text_color()
                                                 };
@@ -467,9 +508,15 @@ impl EditorApp {
                                                         ),
                                                         |ui| {
                                                             ui.add_space(3.0);
-                                                            ui.label(RichText::new("●").color(dot));
+                                                            ui.add(
+                                                                egui::Label::new(
+                                                                    RichText::new("●").color(dot),
+                                                                )
+                                                                .selectable(false),
+                                                            );
                                                             ui.vertical(|ui| {
-                                                                ui.label(
+                                                                ui.add(
+                                                                    egui::Label::new(
                                                                     RichText::new(doc.id(i))
                                                                         .monospace()
                                                                         .size(11.0)
@@ -477,6 +524,8 @@ impl EditorApp {
                                                                             ui.visuals()
                                                                                 .weak_text_color(),
                                                                         ),
+                                                                    )
+                                                                    .selectable(false),
                                                                 );
                                                                 let preview = if doc
                                                                     .thai(i)
@@ -487,22 +536,29 @@ impl EditorApp {
                                                                 } else {
                                                                     doc.thai(i)
                                                                 };
-                                                                ui.label(
-                                                                    RichText::new(truncate(
-                                                                        preview, 48,
-                                                                    ))
-                                                                    .size(13.0),
+                                                                ui.add(
+                                                                    egui::Label::new(
+                                                                        RichText::new(truncate(
+                                                                            preview, 48,
+                                                                        ))
+                                                                        .size(13.0),
+                                                                    )
+                                                                    .selectable(false),
                                                                 );
                                                             });
                                                         },
                                                     )
-                                                    .response
-                                                    .interact(egui::Sense::click());
+                                                    .response;
+                                                let response = ui.interact(
+                                                    response.rect,
+                                                    ui.id().with(("translation-row", i)),
+                                                    egui::Sense::click(),
+                                                );
                                                 if selected {
                                                     ui.painter().rect_stroke(
                                                         response.rect,
                                                         6.0,
-                                                        Stroke::new(1.5_f32, BLUE),
+                                                        Stroke::new(1.5_f32, accent(ui)),
                                                         egui::StrokeKind::Inside,
                                                     );
                                                 }
@@ -634,7 +690,7 @@ impl EditorApp {
                             self.confirm_folder = None
                         }
                         if ui
-                            .button(RichText::new("Discard and open").color(RED))
+                            .button(RichText::new("Discard and open").color(danger(ui)))
                             .clicked()
                         {
                             let p = self.confirm_folder.take().unwrap();
@@ -662,7 +718,7 @@ impl EditorApp {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close)
                         }
                         if ui
-                            .button(RichText::new("Quit without saving").color(RED))
+                            .button(RichText::new("Quit without saving").color(danger(ui)))
                             .clicked()
                         {
                             self.confirm_close = false;
@@ -703,7 +759,7 @@ impl eframe::App for EditorApp {
                             .show(ui, |ui| {
                                 ui.label(
                                     RichText::new(&n.message)
-                                        .color(if n.error { RED } else { GREEN })
+                                        .color(if n.error { danger(ui) } else { success(ui) })
                                         .strong(),
                                 );
                             });
@@ -734,7 +790,12 @@ fn language_pane(
         .inner_margin(12)
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new(title).size(15.0).strong());
+                ui.label(
+                    RichText::new(title)
+                        .size(15.0)
+                        .strong()
+                        .color(primary_text(ui)),
+                );
                 ui.label(
                     RichText::new(subtitle)
                         .size(10.0)
@@ -753,20 +814,39 @@ fn language_pane(
                 }
                 for token in list {
                     let missing = validation.missing.contains(&token);
-                    let btn = egui::Button::new(RichText::new(&token).monospace().size(11.0))
-                        .fill(if missing {
-                            Color32::from_rgb(252, 233, 231)
+                    let chip_bg = if missing {
+                        if ui.visuals().dark_mode {
+                            Color32::from_rgb(92, 45, 55)
                         } else {
-                            Color32::from_rgb(229, 242, 252)
-                        })
-                        .stroke(Stroke::new(
-                            1.0_f32,
-                            if missing {
-                                RED
-                            } else {
-                                Color32::from_rgb(160, 206, 240)
-                            },
-                        ));
+                            Color32::from_rgb(252, 233, 231)
+                        }
+                    } else if ui.visuals().dark_mode {
+                        Color32::from_rgb(68, 71, 90)
+                    } else {
+                        Color32::from_rgb(229, 242, 252)
+                    };
+                    let chip_text = if missing {
+                        danger(ui)
+                    } else if ui.visuals().dark_mode {
+                        Color32::from_rgb(139, 233, 253)
+                    } else {
+                        Color32::from_rgb(23, 95, 157)
+                    };
+                    let btn = egui::Button::new(
+                        RichText::new(&token)
+                            .monospace()
+                            .size(11.0)
+                            .color(chip_text),
+                    )
+                    .fill(if missing { chip_bg } else { chip_bg })
+                    .stroke(Stroke::new(
+                        1.0_f32,
+                        if missing {
+                            danger(ui)
+                        } else {
+                            Color32::from_rgb(160, 206, 240)
+                        },
+                    ));
                     if ui.add(btn).on_hover_text("Click to copy").clicked() {
                         *copy = Some(token)
                     }
@@ -801,19 +881,19 @@ fn language_pane(
 fn validation_banner(ui: &mut egui::Ui, v: &crate::model::Validation, empty: bool) {
     let (color, title, detail) = if empty {
         (
-            ORANGE,
+            warning(ui),
             "Not translated",
             "Type the Thai translation in the right pane.",
         )
     } else if v.ok() {
         (
-            GREEN,
+            success(ui),
             "Symbols are valid",
             "Variables, style markers, and bracketed names match the source.",
         )
     } else {
         (
-            RED,
+            danger(ui),
             "Fix protected symbols",
             v.messages
                 .first()
@@ -910,9 +990,52 @@ fn apply_theme(ctx: &egui::Context, dark: bool) {
     } else {
         egui::Visuals::light()
     };
-    visuals.selection.bg_fill = BLUE;
-    visuals.widgets.active.bg_fill = BLUE;
-    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, BLUE);
+    if dark {
+        // Dracula: strong foreground contrast, restrained surfaces, purple focus.
+        let bg = Color32::from_rgb(40, 42, 54);
+        let raised = Color32::from_rgb(68, 71, 90);
+        let foreground = Color32::from_rgb(248, 248, 242);
+        let purple = Color32::from_rgb(189, 147, 249);
+        visuals.panel_fill = bg;
+        visuals.window_fill = bg;
+        visuals.extreme_bg_color = Color32::from_rgb(33, 34, 44);
+        visuals.faint_bg_color = Color32::from_rgb(49, 51, 65);
+        visuals.code_bg_color = raised;
+        visuals.override_text_color = Some(foreground);
+        visuals.selection.bg_fill = Color32::from_rgb(98, 114, 164);
+        visuals.selection.stroke = Stroke::new(1.0_f32, foreground);
+        visuals.hyperlink_color = Color32::from_rgb(139, 233, 253);
+        visuals.widgets.noninteractive.bg_fill = bg;
+        visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0_f32, foreground);
+        visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, raised);
+        visuals.widgets.inactive.bg_fill = raised;
+        visuals.widgets.inactive.fg_stroke = Stroke::new(1.0_f32, foreground);
+        visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, raised);
+        visuals.widgets.hovered.bg_fill = Color32::from_rgb(98, 114, 164);
+        visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, foreground);
+        visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, purple);
+        visuals.widgets.active.bg_fill = purple;
+        visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, bg);
+        visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, purple);
+    } else {
+        let text = Color32::from_rgb(44, 44, 43);
+        let border = Color32::from_rgb(230, 229, 227);
+        let blue = Color32::from_rgb(39, 131, 222);
+        visuals.panel_fill = Color32::WHITE;
+        visuals.window_fill = Color32::WHITE;
+        visuals.extreme_bg_color = Color32::from_rgb(247, 247, 245);
+        visuals.faint_bg_color = Color32::from_rgb(240, 239, 237);
+        visuals.override_text_color = Some(text);
+        visuals.selection.bg_fill = Color32::from_rgb(200, 226, 247);
+        visuals.selection.stroke = Stroke::new(1.0_f32, text);
+        visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, border);
+        visuals.widgets.inactive.bg_fill = Color32::from_rgb(249, 248, 247);
+        visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, border);
+        visuals.widgets.hovered.bg_fill = Color32::from_rgb(229, 242, 252);
+        visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, blue);
+        visuals.widgets.active.bg_fill = blue;
+        visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, blue);
+    }
     visuals.window_corner_radius = 10.into();
     ctx.set_visuals(visuals);
     let mut style = (*ctx.style()).clone();

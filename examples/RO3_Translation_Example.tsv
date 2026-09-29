@@ -1,0 +1,9 @@
+ID	English	Thai_Translation
+EXAMPLE_SKILL_001	Deals ^{1}${1}%^{2} Neutral melee Physical damage to 【Poring】.	สร้างความเสียหายกายภาพระยะประชิดธาตุ Neutral ^{1}${1}%^{2} แก่ 【Poring】
+EXAMPLE_SKILL_002	Increases STR by ${1} and Move Speed by ${2}% for ${3} sec.	เพิ่ม STR ${1} และ Move Speed ${2}% เป็นเวลา ${3} วินาที
+EXAMPLE_SKILL_003	After using 【Bash】, has a @{1}% Chance to inflict ^{1}【Stun】^{2} for @{2} sec.	หลังใช้ 【Bash】 มีโอกาส @{1}% ที่จะทำให้ติด ^{1}【Stun】^{2} เป็นเวลา @{2} วินาที
+EXAMPLE_ITEM_001	A potion made from fresh herbs.\n^{1}Use: Restores ${1} HP.^{2}	ยาที่ปรุงจากสมุนไพรสด\n^{1}ใช้: ฟื้นฟู HP ${1}^{2}
+EXAMPLE_ITEM_002	Grants [Blessing] and increases Physical DMG Bonus by ${1}%.	มอบ [Blessing] และเพิ่ม Physical DMG Bonus ${1}%
+EXAMPLE_QUEST_001	Talk to Scholar Biko near the fountain in Prontera.	คุยกับ Scholar Biko ใกล้น้ำพุใน Prontera
+EXAMPLE_QUEST_002	Defeat ${1} monsters, then return to 【Captain Hilda】.	กำจัดมอนสเตอร์ ${1} ตัว แล้วกลับไปหา 【Captain Hilda】
+EXAMPLE_WARNING_001	This row intentionally misses ^{1}${1}%^{2} for demonstrating issue detection.	แถวนี้ตั้งใจทำสัญลักษณ์หาย ${1}% เพื่อสาธิตการตรวจข้อผิดพลาด

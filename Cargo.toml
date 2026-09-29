@@ -1,6 +1,6 @@
 [package]
 name = "ro3-translation-editor"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Native TSV translation editor for RO3 localization projects"
 license = "MIT"

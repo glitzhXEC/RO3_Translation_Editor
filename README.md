@@ -4,6 +4,7 @@ Native desktop editor for translating RO3 TSV localization files by hand. This i
 
 ## Design
 
+- **Dracula + minimal light themes:** readable semantic colors, clear focus, and no accidental text selection in row navigation.
 - **Workspace first:** open a folder once and browse every `.tsv` file recursively in Explorer.
 - **Editor workflow:** keep multiple files open as tabs, search rows, and filter by untranslated, issues, or completed rows.
 - **Safe translation:** English is read-only on the left; Thai is editable on the right. `${…}`, `@{…}`, `^{…}`, bracketed names, escaped characters, and HTML-like tags are validated live.
@@ -17,6 +18,8 @@ cargo run
 cargo test
 cargo build --release
 ```
+
+A translated sample with valid and intentionally broken markers is included at `examples/RO3_Translation_Example.tsv`.
 
 The Windows executable is produced at `target/release/ro3-translation-editor.exe`.
 
